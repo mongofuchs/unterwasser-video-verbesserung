@@ -1,6 +1,9 @@
 import os
 import subprocess
 import tempfile
+import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
@@ -43,10 +46,25 @@ def _make_compare(original: np.ndarray, enhanced: np.ndarray) -> np.ndarray:
     return np.hstack([original, enhanced])
 
 
+def _process_worker(frame: np.ndarray, strength: float, denoise: bool) -> np.ndarray:
+    return process_frame(frame, strength=strength, denoise=denoise)
+
+
+def _format_eta(seconds: float) -> str:
+    if not seconds or seconds == float("inf") or seconds < 0:
+        return ""
+    seconds = int(seconds)
+    if seconds >= 3600:
+        return f"{seconds // 3600} h {(seconds % 3600) // 60} min"
+    if seconds >= 60:
+        return f"{seconds // 60} min"
+    return f"{seconds} s"
+
+
 def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
                   denoise: bool = False, compare: bool = False,
                   crf: int = 18, progress_callback=None,
-                  preview_callback=None) -> None:
+                  preview_callback=None, workers: int = None) -> None:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError("Video konnte nicht gelesen werden.")
@@ -61,8 +79,14 @@ def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
         raise ValueError("Video hat keine gueltige Aufloesung.")
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    if workers is None:
+        workers = max(1, min(8, (os.cpu_count() or 1) - 1))
+    batch = max(2, workers * 2)
+
     out_width, out_height = width // 2 * 2, height // 2 * 2
     out_fps = min(fps, 60.0)
+
+    start_time = time.monotonic()
 
     with tempfile.TemporaryDirectory() as tmp:
         raw_path = os.path.join(tmp, "raw.mp4")
@@ -73,26 +97,50 @@ def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
             raise RuntimeError("Videoschreiber konnte nicht geoeffnet werden.")
 
         index = 0
+        next_to_write = 0
+        read_failed = False
+        pending = OrderedDict()
         first_pair = None
+        first_pair_done = False
+
         try:
-            while True:
-                ok, frame = cap.read()
-                if not ok:
-                    break
-                enhanced = process_frame(frame, strength=strength, denoise=denoise)
-                if index == 0 and preview_callback is not None:
-                    first_pair = (frame, enhanced)
-                if out_width != width or out_height != height:
-                    enhanced = cv2.resize(enhanced, (out_width, out_height))
-                writer.write(enhanced)
-                index += 1
-                if progress_callback is not None and total > 0:
-                    progress_callback(min(index / total, 1.0))
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                while True:
+                    if not read_failed:
+                        ok, frame = cap.read()
+                        if ok:
+                            pending[index] = (frame, ex.submit(
+                                _process_worker, frame, strength, denoise))
+                            index += 1
+                        else:
+                            read_failed = True
+                    if len(pending) >= batch or (read_failed and pending):
+                        original, future = pending.pop(next_to_write)
+                        enhanced = future.result()
+                        if not first_pair_done and preview_callback is not None:
+                            first_pair_done = True
+                            first_pair = (original, enhanced)
+                        if out_width != enhanced.shape[1] or out_height != enhanced.shape[0]:
+                            enhanced = cv2.resize(enhanced, (out_width, out_height))
+                        writer.write(enhanced)
+                        next_to_write += 1
+                        if progress_callback is not None and total > 0:
+                            frac = min(next_to_write / total, 1.0)
+                            elapsed = time.monotonic() - start_time
+                            eta = _format_eta(
+                                elapsed / max(next_to_write, 1)
+                                * (total - next_to_write))
+                            desc = "Verarbeite Frames"
+                            if eta:
+                                desc += f" (ca. {eta} verbleibend)"
+                            progress_callback(frac, desc=desc)
+                    if read_failed and not pending:
+                        break
         finally:
             cap.release()
             writer.release()
 
-        if first_pair is not None:
+        if first_pair is not None and preview_callback is not None:
             preview_callback(first_pair)
 
         if compare:

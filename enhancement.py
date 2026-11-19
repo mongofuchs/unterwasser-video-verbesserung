@@ -41,7 +41,7 @@ def boost_saturation(image: np.ndarray, factor: float) -> np.ndarray:
 def denoise_frame(image: np.ndarray, strength: int) -> np.ndarray:
     if strength <= 0:
         return image
-    return cv2.fastNlMeansDenoisingColored(image, None, strength, strength, 7, 21)
+    return cv2.fastNlMeansDenoisingColored(image, None, strength, strength, 7, 15)
 
 
 def process_frame(image: np.ndarray, strength: float = 1.0,
