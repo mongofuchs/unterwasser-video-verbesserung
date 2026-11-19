@@ -23,8 +23,8 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
     output_path = os.path.join(out_dir, "verbessert.mp4")
     state = {"preview": None}
 
-    def on_progress(frac):
-        progress(frac, desc="Verarbeite Frames")
+    def on_progress(frac, desc=None):
+        progress(frac, desc=desc or "Verarbeite Frames")
 
     def on_preview(pair):
         original, enhanced = pair
