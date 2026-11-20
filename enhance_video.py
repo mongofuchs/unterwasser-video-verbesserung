@@ -140,6 +140,9 @@ def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
             cap.release()
             writer.release()
 
+        if next_to_write == 0:
+            raise ValueError("Das Video enthielt keine sichtbaren Frames.")
+
         if first_pair is not None and preview_callback is not None:
             preview_callback(first_pair)
 
