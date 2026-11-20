@@ -26,6 +26,10 @@ HEADER_HTML = """
   <span class="fish f3" style="animation-delay: -16s; top: 18%; font-size: 22px;">🐟</span>
   <span class="fish f4" style="animation-delay: -4s; top: 72%; font-size: 26px;">🦈</span>
   <span class="fish f5" style="animation-delay: -21s; top: 42%; font-size: 38px;">🐬</span>
+  <div class="monster m1" style="animation-delay: -3s;  top: 64%; font-size: 46px;">🦑</div>
+  <div class="monster m2" style="animation-delay: -15s; top: 82%; font-size: 42px;">🐙</div>
+  <div class="monster m3" style="animation-delay: -9s;  top: 10%; font-size: 52px;">🐋</div>
+  <div class="monster m4" style="animation-delay: -20s; top: 44%; font-size: 44px;">🦕</div>
   <div class="diver">🤿</div>
   <div class="seabed">
     <span class="coral c1">🪸</span>
@@ -119,6 +123,18 @@ OCEAN_CSS = """
   100% { transform: translateX(118vw) rotate(2deg); }
 }
 
+/* Tiefseekreaturen mit Leuchtorgan-Schimmer, schwimmen von rechts */
+.monster {
+  position: absolute; z-index: 3; right: -110px; pointer-events: none;
+  filter: drop-shadow(0 0 14px rgba(0, 255, 210, 0.55)) drop-shadow(0 6px 10px rgba(0, 20, 40, 0.6));
+  animation: swim-rtl 44s linear infinite;
+}
+@keyframes swim-rtl {
+  0%   { transform: translateX(0) scaleX(-1) translateY(0); }
+  45%  { transform: translateX(-62vw) scaleX(-1) translateY(-16px); }
+  100% { transform: translateX(-130vw) scaleX(-1) translateY(6px); }
+}
+
 /* Taucher schwebt */
 .diver {
   position: absolute; z-index: 4; right: 8%; bottom: 34%; font-size: 40px; pointer-events: none;
@@ -169,7 +185,7 @@ label, .label-wrap, span.label { color: var(--ink) !important; }
 /* ---------- Videofenster = Tauchmaske ---------- */
 .mask-frame {
   border: 12px solid #101d29 !important;
-  border-radius: 44% 44% 34% 34% / 40% 40% 26% 26% !important;
+  border-radius: 46% 46% 12% 12% / 46% 46% 8% 8% !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 2px 14px rgba(150, 230, 255, 0.25),
               0 0 0 3px rgba(120, 200, 235, 0.35) !important;
   overflow: hidden !important;
@@ -177,9 +193,20 @@ label, .label-wrap, span.label { color: var(--ink) !important; }
   background: #04121d;
 }
 .mask-frame::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  border-radius: inherit;
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 42%; pointer-events: none;
+  border-radius: 40% 40% 0 0 / 40% 40% 0 0;
   background: linear-gradient(118deg, transparent 46%, rgba(210, 240, 255, 0.10) 50%, transparent 56%);
+}
+.mask-frame video { width: 100% !important; height: auto !important; display: block; }
+.mask-frame video::-webkit-media-controls-panel {
+  background-image: linear-gradient(transparent, rgba(4, 18, 29, 0.92)) !important;
+}
+.mask-frame video::-webkit-media-controls-play-button,
+.mask-frame video::-webkit-media-controls-mute-button,
+.mask-frame video::-webkit-media-controls-toggle-closed-captions-button { opacity: 1; }
+/* Gradio-Controls interaktiv lassen */
+.mask-frame a, .mask-frame button, .mask-frame .icon-button {
+  pointer-events: auto !important;
 }
 .mask-label { display: block; text-align: center; margin-bottom: 6px; color: var(--aqua); font-weight: 600; letter-spacing: 0.04em; }
 
@@ -279,7 +306,8 @@ with gr.Blocks(title=TITLE) as demo:
     with gr.Row():
         with gr.Column():
             gr.HTML('<span class="mask-label">🫧 Ausrüstung</span>')
-            video_in = gr.Video(label="Unterwasservideo hochladen", elem_classes="mask-frame")
+            video_in = gr.Video(label="Unterwasservideo hochladen", show_label=False,
+                                 elem_classes="mask-frame")
             strength = gr.Slider(0.5, 2.5, value=1.0, step=0.1,
                                  label="🎚 Atemregler – Verbesserungsstärke")
             denoise = gr.Checkbox(value=False,
@@ -292,8 +320,9 @@ with gr.Blocks(title=TITLE) as demo:
                                elem_classes="btn-tank")
         with gr.Column():
             gr.HTML('<span class="mask-label">🪸 Fundstücke</span>')
-            video_out = gr.Video(label="Ergebnis", elem_classes="mask-frame")
-            image_out = gr.Image(label="Vorschau: Original | Verbessert",
+            video_out = gr.Video(label="Ergebnis", show_label=False,
+                                  elem_classes="mask-frame")
+            image_out = gr.Image(label="Vorschau: Original | Verbessert", show_label=False,
                                  elem_classes="mask-frame")
     gr.HTML(FOOTER_HTML)
 
