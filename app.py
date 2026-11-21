@@ -165,37 +165,30 @@ OCEAN_CSS = """
 }
 
 /* ---------- Panels als Muschel-/Nacre-Karten ---------- */
-.gr-panel, .block {
+.gr-panel {
   background: linear-gradient(160deg, rgba(9, 45, 70, 0.82), rgba(6, 30, 48, 0.9)) !important;
   border: 1px solid rgba(120, 220, 255, 0.22) !important;
   box-shadow: 0 8px 26px rgba(0, 10, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
   border-radius: 18px !important;
   color: var(--ink);
 }
-/* Perlmutt-Glanz oben */
-.gr-panel::before, .block::before {
-  content: ""; position: absolute; inset: 0; border-radius: 18px; pointer-events: none;
-  background: linear-gradient(120deg, rgba(255,255,255,0.07) 0%, transparent 30%, transparent 70%, rgba(246, 231, 207, 0.05) 100%);
-}
+.dive-row { align-items: stretch !important; }
+.dive-col { flex: 1 1 0 !important; min-width: 340px !important; }
 
 body, .gradio-container { background: linear-gradient(180deg, var(--deep-2), var(--deep-1)) !important; color: var(--ink) !important; }
 
 label, .label-wrap, span.label { color: var(--ink) !important; }
 
-/* ---------- Videofenster = Tauchmaske ---------- */
+/* ---------- Videofenster = Tauchmaske (stabile Form) ---------- */
 .mask-frame {
-  border: 12px solid #101d29 !important;
-  border-radius: 46% 46% 12% 12% / 46% 46% 8% 8% !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 2px 14px rgba(150, 230, 255, 0.25),
-              0 0 0 3px rgba(120, 200, 235, 0.35) !important;
+  border: 10px solid #101d29 !important;
+  border-radius: 26px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 2px 14px rgba(150, 230, 255, 0.2),
+              0 0 0 3px rgba(120, 200, 235, 0.3) !important;
   overflow: hidden !important;
   position: relative;
   background: #04121d;
-}
-.mask-frame::after {
-  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 42%; pointer-events: none;
-  border-radius: 40% 40% 0 0 / 40% 40% 0 0;
-  background: linear-gradient(118deg, transparent 46%, rgba(210, 240, 255, 0.10) 50%, transparent 56%);
+  min-width: 0 !important;
 }
 .mask-frame video { width: 100% !important; height: auto !important; display: block; }
 .mask-frame video::-webkit-media-controls-panel {
@@ -298,13 +291,13 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
 
     if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
         raise gr.Error("Ergebnisvideo fehlt oder ist leer – bitte Konsole prüfen.")
-    return output_path, state["preview"]
+    return output_path, state["preview"], gr.update(visible=True, value=output_path)
 
 
 with gr.Blocks(title=TITLE) as demo:
     gr.HTML(HEADER_HTML)
-    with gr.Row():
-        with gr.Column():
+    with gr.Row(elem_classes="dive-row", equal_height=True):
+        with gr.Column(scale=1, elem_classes="dive-col"):
             gr.HTML('<span class="mask-label">🫧 Ausrüstung</span>')
             video_in = gr.Video(label="Unterwasservideo hochladen", show_label=False,
                                  elem_classes="mask-frame")
@@ -318,16 +311,18 @@ with gr.Blocks(title=TITLE) as demo:
                                   elem_classes="btn-aux")
             button = gr.Button("🤿 Abtauchen & Video verbessern", variant="primary",
                                elem_classes="btn-tank")
-        with gr.Column():
+        with gr.Column(scale=1, elem_classes="dive-col"):
             gr.HTML('<span class="mask-label">🪸 Fundstücke</span>')
             video_out = gr.Video(label="Ergebnis", show_label=False,
                                   elem_classes="mask-frame")
             image_out = gr.Image(label="Vorschau: Original | Verbessert", show_label=False,
                                  elem_classes="mask-frame")
+            download_btn = gr.DownloadButton("💾 Tauchrolle speichern – Video herunterladen",
+                                             visible=False, elem_classes="btn-tank")
     gr.HTML(FOOTER_HTML)
 
     button.click(run, inputs=[video_in, strength, denoise, compare],
-                 outputs=[video_out, image_out])
+                 outputs=[video_out, image_out, download_btn])
 
 
 if __name__ == "__main__":
