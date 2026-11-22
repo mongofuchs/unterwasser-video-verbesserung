@@ -173,3 +173,35 @@ def _process_compare(video_path: str, raw_path: str, output_path: str,
     writer.release()
     _mux_output(video_path, cmp_path, output_path, crf)
     os.remove(cmp_path)
+
+
+def video_duration(video_path: str) -> float:
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError("Video konnte nicht gelesen werden.")
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 0:
+        fps = 30.0
+    frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    cap.release()
+    if not frames or frames <= 0:
+        raise ValueError("Video enthaelt keine Frames.")
+    return frames / fps
+
+
+def trim_video(video_path: str, output_path: str, start: float, end: float,
+               crf: int = 18) -> None:
+    if end <= start:
+        raise ValueError("Ende liegt vor dem Beginn.")
+    if end - start < 0.5:
+        raise ValueError("Ausschnitt ist kuerzer als 0,5 s.")
+    _run_ffmpeg([
+        "-ss", f"{float(start):.3f}",
+        "-i", str(video_path),
+        "-t", f"{float(end - start):.3f}",
+        "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
+        str(output_path),
+    ])
