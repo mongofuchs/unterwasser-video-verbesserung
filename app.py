@@ -305,10 +305,39 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
         gr.update(visible=True),
         gr.update(maximum=duration, value=0.0, visible=True),
         gr.update(maximum=duration, value=round(duration, 2), visible=True),
-        "🫧 Schieb die Regler auf deinen Lieblingsabschnitt und drück “✂️ Zuschnitt schneiden”. "
+        "🫧 Schieb die Regler auf deinen Lieblingsabschnitt – beide Bildfenster zeigen live, "
+        "welches Frame an der Reglerposition liegt. Dann drück “✂️ Zuschnitt schneiden”. "
         "Beim Download-Roller kannst du den Dateinamen wählen; der Browser-Dialog entscheidet den Ordner.",
         {"path": output_path, "dir": out_dir},
+        gr.update(value=_frame_at(output_path, 0.0)),
+        gr.update(value=_frame_at(output_path, duration)),
     )
+
+
+PREVIEW_WIDTH = 480
+
+
+def _frame_at(path: str, seconds: float):
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        return None
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 0:
+        fps = 30.0
+    cap.set(cv2.CAP_PROP_POS_FRAMES, max(int(float(seconds) * fps), 0))
+    ok, frame = cap.read()
+    cap.release()
+    if not ok:
+        return None
+    scale = PREVIEW_WIDTH / frame.shape[1]
+    frame = cv2.resize(frame, (PREVIEW_WIDTH, int(frame.shape[0] * scale)))
+    return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+
+def preview_frame(trim_state, t):
+    if not trim_state:
+        return None
+    return _frame_at(trim_state["path"], float(t))
 
 
 def do_trim(trim_state, start, end, filename, progress=gr.Progress()):
@@ -330,6 +359,8 @@ def do_trim(trim_state, start, end, filename, progress=gr.Progress()):
         gr.update(maximum=duration, value=round(duration, 2)),
         f"✂️ Zuschnitt fertig: {_safe_name(filename)}.mp4 ({duration:.1f} s) – Roller speichert jetzt diesen Schnitt.",
         {"path": out, "dir": trim_state["dir"]},
+        gr.update(value=_frame_at(out, 0.0)),
+        gr.update(value=_frame_at(out, duration)),
     )
 
 
@@ -362,6 +393,11 @@ with gr.Blocks(title=TITLE) as demo:
                                        label="✂️ Beginn (Sekunden)")
                 trim_end = gr.Slider(0.0, 1.0, value=1.0, step=0.1, visible=False,
                                      label="✂️ Ende (Sekunden)")
+                with gr.Row():
+                    start_img = gr.Image(label="📍 Frame am Beginn", show_label=True,
+                                         interactive=False)
+                    end_img = gr.Image(label="📍 Frame am Ende", show_label=True,
+                                       interactive=False)
                 trim_btn = gr.Button("✂️ Zuschnitt schneiden", variant="primary",
                                      elem_classes="btn-aux")
                 trim_filename = gr.Textbox(value="zuschnitt", label="📁 Dateiname fürs globale Speichern (ohne .mp4)")
@@ -373,10 +409,13 @@ with gr.Blocks(title=TITLE) as demo:
 
     button.click(run, inputs=[video_in, strength, denoise, compare],
                  outputs=[video_out, image_out, download_btn, trim_group,
-                          trim_start, trim_end, trim_status, trim_state])
+                          trim_start, trim_end, trim_status, trim_state,
+                          start_img, end_img])
     trim_btn.click(do_trim, inputs=[trim_state, trim_start, trim_end, trim_filename],
                    outputs=[video_out, download_btn, trim_start, trim_end,
-                            trim_status, trim_state])
+                            trim_status, trim_state, start_img, end_img])
+    trim_start.change(preview_frame, inputs=[trim_state, trim_start], outputs=[start_img])
+    trim_end.change(preview_frame, inputs=[trim_state, trim_end], outputs=[end_img])
 
 
 if __name__ == "__main__":
