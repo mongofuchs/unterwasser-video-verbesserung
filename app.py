@@ -1,11 +1,17 @@
 import os
+import re
 import tempfile
 
 import cv2
 import gradio as gr
 import numpy as np
 
-from enhance_video import enhance_video
+from enhance_video import enhance_video, trim_video, video_duration
+
+
+def _safe_name(name: str) -> str:
+    name = re.sub(r'[\\/:*?"<>|]', "_", (name or "").strip())
+    return name or "zuschnitt"
 
 TITLE = "Unterwasser-Videoverbesserung"
 DESCRIPTION = (
@@ -291,7 +297,40 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
 
     if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
         raise gr.Error("Ergebnisvideo fehlt oder ist leer – bitte Konsole prüfen.")
-    return output_path, state["preview"], gr.update(visible=True, value=output_path)
+    duration = video_duration(output_path)
+    return (
+        output_path,
+        state["preview"],
+        gr.update(visible=True, value=output_path),
+        gr.update(visible=True),
+        gr.update(maximum=duration, value=0.0, visible=True),
+        gr.update(maximum=duration, value=round(duration, 2), visible=True),
+        "🫧 Schieb die Regler auf deinen Lieblingsabschnitt und drück “✂️ Zuschnitt schneiden”. "
+        "Beim Download-Roller kannst du den Dateinamen wählen; der Browser-Dialog entscheidet den Ordner.",
+        {"path": output_path, "dir": out_dir},
+    )
+
+
+def do_trim(trim_state, start, end, filename, progress=gr.Progress()):
+    if not trim_state:
+        raise gr.Error("Erst ein Video verbessern – dann kann zugeschnitten werden. 🤿")
+    src = trim_state["path"]
+    out = os.path.join(trim_state["dir"], f"{_safe_name(filename)}.mp4")
+    try:
+        trim_video(src, out, float(start), float(end))
+    except RuntimeError as e:
+        raise gr.Error("Zuschnitt fehlgeschlagen (ffmpeg): " + str(e).strip()[-300:])
+    except ValueError as e:
+        raise gr.Error(str(e))
+    duration = video_duration(out)
+    return (
+        out,
+        gr.update(visible=True, value=out),
+        gr.update(maximum=duration, value=0.0),
+        gr.update(maximum=duration, value=round(duration, 2)),
+        f"✂️ Zuschnitt fertig: {_safe_name(filename)}.mp4 ({duration:.1f} s) – Roller speichert jetzt diesen Schnitt.",
+        {"path": out, "dir": trim_state["dir"]},
+    )
 
 
 with gr.Blocks(title=TITLE) as demo:
@@ -317,12 +356,27 @@ with gr.Blocks(title=TITLE) as demo:
                                   elem_classes="mask-frame")
             image_out = gr.Image(label="Vorschau: Original | Verbessert", show_label=False,
                                  elem_classes="mask-frame")
-            download_btn = gr.DownloadButton("💾 Tauchrolle speichern – Video herunterladen",
-                                             visible=False, elem_classes="btn-tank")
+            with gr.Group(visible=False) as trim_group:
+                gr.HTML('<span class="mask-label">✂️ Schneiderei – Trimm</span>')
+                trim_start = gr.Slider(0.0, 1.0, value=0.0, step=0.1, visible=False,
+                                       label="✂️ Beginn (Sekunden)")
+                trim_end = gr.Slider(0.0, 1.0, value=1.0, step=0.1, visible=False,
+                                     label="✂️ Ende (Sekunden)")
+                trim_btn = gr.Button("✂️ Zuschnitt schneiden", variant="primary",
+                                     elem_classes="btn-aux")
+                trim_filename = gr.Textbox(value="zuschnitt", label="📁 Dateiname fürs globale Speichern (ohne .mp4)")
+                trim_status = gr.Markdown("")
+                download_btn = gr.DownloadButton("💾 Tauchrolle speichern – Video herunterladen",
+                                                 visible=False, elem_classes="btn-tank")
+    trim_state = gr.State(None)
     gr.HTML(FOOTER_HTML)
 
     button.click(run, inputs=[video_in, strength, denoise, compare],
-                 outputs=[video_out, image_out, download_btn])
+                 outputs=[video_out, image_out, download_btn, trim_group,
+                          trim_start, trim_end, trim_status, trim_state])
+    trim_btn.click(do_trim, inputs=[trim_state, trim_start, trim_end, trim_filename],
+                   outputs=[video_out, download_btn, trim_start, trim_end,
+                            trim_status, trim_state])
 
 
 if __name__ == "__main__":
