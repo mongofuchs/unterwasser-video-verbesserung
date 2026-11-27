@@ -70,7 +70,7 @@ body, .gradio-container {
   color: var(--ink) !important;
 }
 
-.gradio-container { max-width: 1180px !important; margin: 0 auto !important; font-size: 15px; }
+.gradio-container { width: 96vw !important; max-width: 96vw !important; margin: 0 auto !important; font-size: 15px; }
 
 /* ============ Header-Szene ============ */
 .ocean-scene {
@@ -276,6 +276,17 @@ input[type="text"], textarea {
 }
 input[type="text"]:focus { border-color: var(--aqua) !important; }
 
+/* Ergebnis-Video ueber die volle Breite (Platz fuer Vergleichsmaske) */
+.result-row {
+  background: var(--panel) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 18px !important;
+  padding: 16px !important;
+  margin-top: 16px !important;
+  box-shadow: 0 8px 24px rgba(0, 10, 20, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+.result-row .mask-frame { width: 100% !important; }
+
 /* ============ Media ============ */
 .mask-frame {
   border: 8px solid #101d29 !important;
@@ -295,7 +306,7 @@ input[type="text"]:focus { border-color: var(--aqua) !important; }
 .trim-previews { gap: 10px !important; }
 .trim-previews .block { min-width: 0 !important; }
 .trim-previews img {
-  height: 150px !important;
+  height: 190px !important;
   width: 100% !important;
   object-fit: cover !important;
   border-radius: 10px !important;
@@ -484,8 +495,6 @@ with gr.Blocks(title=TITLE) as demo:
                                elem_classes="btn-tank")
         with gr.Column(elem_classes="dive-col"):
             gr.HTML('<span class="mask-label">🪸 Fundstücke</span>')
-            video_out = gr.Video(label="Ergebnis", show_label=False,
-                                  elem_classes="mask-frame")
             image_out = gr.Image(label="Vorschau: Original | Verbessert", show_label=False,
                                  elem_classes="mask-frame")
             with gr.Group(visible=False) as trim_group:
@@ -504,6 +513,10 @@ with gr.Blocks(title=TITLE) as demo:
                 trim_status = gr.Markdown("")
                 download_btn = gr.DownloadButton("💾 Tauchrolle speichern – Video herunterladen",
                                                  visible=False, elem_classes="btn-tank")
+    with gr.Group(elem_classes="result-row"):
+        gr.HTML('<span class="mask-label">🎬 Ergebnis – volle Breite</span>')
+        video_out = gr.Video(label="Ergebnis", show_label=False,
+                              elem_classes="mask-frame")
     trim_state = gr.State(None)
     gr.HTML(FOOTER_HTML)
 
