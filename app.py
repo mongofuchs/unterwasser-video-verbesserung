@@ -378,6 +378,8 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
 
     out_dir = tempfile.mkdtemp(prefix="uwv_")
     output_path = os.path.join(out_dir, "verbessert.mp4")
+    download_path = (os.path.join(out_dir, "verbessert_nur.mp4")
+                     if compare else output_path)
     state = {"preview": None}
 
     def on_progress(frac, desc=None):
@@ -400,6 +402,7 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
             compare=bool(compare),
             progress_callback=on_progress,
             preview_callback=on_preview,
+            download_path=download_path,
         )
     except RuntimeError as e:
         detail = str(e).strip().splitlines()[-3:]
@@ -409,22 +412,23 @@ def run(video, strength, denoise, compare, progress=gr.Progress()):
     except Exception as e:
         raise gr.Error(f"Unerwarteter Tauchunfall: {type(e).__name__} – {str(e)[-200:]}")
 
-    if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
+    if not os.path.isfile(download_path) or os.path.getsize(download_path) == 0:
         raise gr.Error("Ergebnisvideo fehlt oder ist leer – bitte Konsole prüfen.")
-    duration = video_duration(output_path)
+    duration = video_duration(download_path)
     return (
         output_path,
         state["preview"],
-        gr.update(visible=True, value=output_path),
+        gr.update(visible=True, value=download_path),
         gr.update(visible=True),
         gr.update(maximum=duration, value=0.0, visible=True),
         gr.update(maximum=duration, value=round(duration, 2), visible=True),
         "🫧 Schieb die Regler auf deinen Lieblingsabschnitt – beide Bildfenster zeigen live, "
         "welches Frame an der Reglerposition liegt. Dann drück „✂️ Zuschnitt schneiden“. "
-        "Beim Download-Roller kannst du den Dateinamen wählen; der Browser-Dialog entscheidet den Ordner.",
-        {"path": output_path, "dir": out_dir},
-        gr.update(value=_frame_at(output_path, 0.0)),
-        gr.update(value=_frame_at(output_path, duration)),
+        "Der Download-Roller liefert immer nur das reine verbesserte Video (kein Vergleichsbild); "
+        "den Ordner wählt der Browser-Dialog.",
+        {"path": download_path, "dir": out_dir},
+        gr.update(value=_frame_at(download_path, 0.0)),
+        gr.update(value=_frame_at(download_path, duration)),
     )
 
 

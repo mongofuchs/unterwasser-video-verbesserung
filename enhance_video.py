@@ -64,7 +64,8 @@ def _format_eta(seconds: float) -> str:
 def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
                   denoise: bool = False, compare: bool = False,
                   crf: int = 18, progress_callback=None,
-                  preview_callback=None, workers: int = None) -> None:
+                  preview_callback=None, workers: int = None,
+                  download_path: str = None) -> None:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError("Video konnte nicht gelesen werden.")
@@ -147,10 +148,15 @@ def enhance_video(video_path: str, output_path: str, strength: float = 1.0,
             preview_callback(first_pair)
 
         if compare:
+            if not download_path:
+                download_path = output_path
+            _mux_output(video_path, raw_path, download_path, crf)
             _process_compare(video_path, raw_path, output_path, strength,
                              denoise, out_width, out_height, crf)
         else:
-            _mux_output(video_path, raw_path, output_path, crf)
+            if not download_path:
+                download_path = output_path
+            _mux_output(video_path, raw_path, download_path, crf)
 
 
 def _process_compare(video_path: str, raw_path: str, output_path: str,
